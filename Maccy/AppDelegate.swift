@@ -88,9 +88,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
+  @MainActor private lazy var draftWatcher = DraftWatcher()
+
   func applicationDidFinishLaunching(_ aNotification: Notification) {
     migrateUserDefaults()
     disableUnusedGlobalHotkeys()
+    draftWatcher.start()
 
     panel = FloatingPanel(
       contentRect: NSRect(origin: .zero, size: Defaults[.windowSize]),

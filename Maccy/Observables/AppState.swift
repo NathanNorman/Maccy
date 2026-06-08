@@ -2,6 +2,7 @@ import AppKit
 import Defaults
 import Foundation
 import Settings
+import SwiftData
 import SwiftUI
 
 @Observable
@@ -16,6 +17,47 @@ class AppState: Sendable {
   var footer: Footer
   var navigator: NavigationManager
   var preview: SlideoutController
+
+  var activeTab: ActiveTab = .history
+  var drafts: [DraftItemDecorator] = []
+  var selectedDraft: DraftItemDecorator?
+
+  struct PreviewIdentity {
+    let name: String
+    let avatarDataURL: String
+  }
+
+  var previewIdentity: PreviewIdentity = AppState.loadPreviewIdentity()
+
+  func reloadPreviewIdentity() {
+    previewIdentity = AppState.loadPreviewIdentity()
+  }
+
+  private static func loadPreviewIdentity() -> PreviewIdentity {
+    let svgString = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'><circle cx='18' cy='18' r='18' fill='#DDD'/><circle cx='18' cy='14' r='6' fill='#AAA'/><ellipse cx='18' cy='30' rx='11' ry='8' fill='#AAA'/></svg>"
+    let genericAvatarURL = "data:image/svg+xml;base64,\(Data(svgString.utf8).base64EncodedString())"
+    var name = "You"
+    var avatarDataURL = genericAvatarURL
+    let jsonURL = URL.applicationSupportDirectory.appending(path: "Maccy/preview-identity.json")
+    struct Config: Decodable { let name: String?; let avatarPath: String? }
+    if let data = try? Data(contentsOf: jsonURL),
+       let config = try? JSONDecoder().decode(Config.self, from: data) {
+      if let n = config.name, !n.isEmpty { name = n }
+      if let path = config.avatarPath, let src = NSImage(contentsOfFile: path) {
+        let size = NSSize(width: 36, height: 36)
+        let resized = NSImage(size: size)
+        resized.lockFocus()
+        src.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .copy, fraction: 1)
+        resized.unlockFocus()
+        if let tiff = resized.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiff),
+           let png = bitmap.representation(using: .png, properties: [:]) {
+          avatarDataURL = "data:image/png;base64,\(png.base64EncodedString())"
+        }
+      }
+    }
+    return PreviewIdentity(name: name, avatarDataURL: avatarDataURL)
+  }
 
   var searchVisible: Bool {
     if !Defaults[.showSearch] { return false }
@@ -148,6 +190,13 @@ class AppState: Sendable {
             IgnoreSettingsPane()
           },
           Settings.Pane(
+            identifier: Settings.PaneIdentifier.drafts,
+            title: "Drafts",
+            toolbarIcon: NSImage.squareAndPencil!
+          ) {
+            DraftsSettingsPane()
+          },
+          Settings.Pane(
             identifier: Settings.PaneIdentifier.advanced,
             title: NSLocalizedString("Title", tableName: "AdvancedSettings", comment: ""),
             toolbarIcon: NSImage.gearshape2!
@@ -161,7 +210,48 @@ class AppState: Sendable {
     settingsWindowController?.window?.orderFrontRegardless()
   }
 
+  @MainActor
+  func selectDraft(_ draft: DraftItemDecorator) {
+    let board = NSPasteboard.general
+    board.clearContents()
+    if let data = draft.html.data(using: .utf8) {
+      board.setData(data, forType: .html)
+    }
+    if let plain = draft.plain {
+      board.setString(plain, forType: .string)
+    }
+    board.setString("", forType: .fromMaccy)
+    popup.close()
+  }
+
+  @MainActor
+  func hoverDraft(_ draft: DraftItemDecorator) {
+    selectedDraft = draft
+    preview.resetAutoOpenSuppression()
+    preview.startAutoOpen()
+  }
+
+  @MainActor
+  func deleteSelectedDraft() {
+    guard let draft = selectedDraft else { return }
+    let context = Storage.shared.context
+    let id = draft.draftId
+    if let item = try? context.fetch(FetchDescriptor<DraftItem>(
+      predicate: #Predicate { $0.id == id }
+    )).first {
+      context.delete(item)
+      try? context.save()
+    }
+    drafts.removeAll { $0.id == draft.id }
+    selectedDraft = drafts.first
+  }
+
   func quit() {
     NSApp.terminate(self)
   }
+}
+
+enum ActiveTab {
+  case history
+  case drafts
 }

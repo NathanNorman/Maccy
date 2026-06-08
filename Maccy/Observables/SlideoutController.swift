@@ -146,8 +146,10 @@ class SlideoutController {
 
   func togglePreview(trigger: SlideoutToggleTrigger = .manual) {
     if !state.isOpen {
-      let navigator = AppState.shared.navigator
-      guard navigator.leadHistoryItem != nil || navigator.pasteStackSelected else { return }
+      let appState = AppState.shared
+      let navigator = appState.navigator
+      let hasDraftSelected = appState.activeTab == .drafts && appState.selectedDraft != nil
+      guard navigator.leadHistoryItem != nil || navigator.pasteStackSelected || hasDraftSelected else { return }
     }
 
     if trigger == .manual {

@@ -40,6 +40,7 @@ enum KeyChord: CaseIterable {
   case selectCurrentItem
   case close
   case togglePreview
+  case switchTab
   case unknown
 
   init(_ event: NSEvent?) {
@@ -114,6 +115,8 @@ enum KeyChord: CaseIterable {
       self = .moveToFirst
     case (KeyChord.pinKey, KeyChord.pinModifiers):
       self = .pinOrUnpin
+    case (.d, [.command]):
+      self = .switchTab
     case (.comma, [.command]):
       self = .openPreferences
     case (.return, _),

@@ -26,6 +26,69 @@ struct KeyHandlingView<Content: View>: View {
           }
         }
 
+        // Tab toggle (⌘D) — works from either tab
+        if case .switchTab = KeyChord(NSApp.currentEvent) {
+          let newTab: ActiveTab = appState.activeTab == .history ? .drafts : .history
+          appState.activeTab = newTab
+          appState.selectedDraft = nil
+          if newTab == .drafts {
+            appState.preview.slideoutWidth = max(appState.preview.slideoutWidth, 400)
+          }
+          return .handled
+        }
+
+        // Draft tab key handling
+        if appState.activeTab == .drafts {
+          switch KeyChord(NSApp.currentEvent) {
+          case .selectCurrentItem:
+            if let draft = appState.selectedDraft {
+              appState.selectDraft(draft)
+            }
+            return .handled
+          case .deleteCurrentItem:
+            appState.deleteSelectedDraft()
+            return .handled
+          case .moveToNext:
+            if let current = appState.selectedDraft,
+               let idx = appState.drafts.firstIndex(where: { $0.id == current.id }),
+               idx + 1 < appState.drafts.count {
+              appState.hoverDraft(appState.drafts[idx + 1])
+            } else if appState.selectedDraft == nil, let first = appState.drafts.first {
+              appState.hoverDraft(first)
+            }
+            return .handled
+          case .moveToPrevious:
+            if let current = appState.selectedDraft,
+               let idx = appState.drafts.firstIndex(where: { $0.id == current.id }),
+               idx > 0 {
+              appState.hoverDraft(appState.drafts[idx - 1])
+            }
+            return .handled
+          case .close:
+            appState.popup.close()
+            return .handled
+          case .togglePreview:
+            appState.preview.togglePreview()
+            return .handled
+          case .openPreferences:
+            appState.openPreferences()
+            return .handled
+          default:
+            // ⌘+number selects Nth draft
+            if let event = NSApp.currentEvent,
+               event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+               let char = event.charactersIgnoringModifiers,
+               let digit = Int(char), digit >= 1 {
+              let idx = digit - 1
+              if idx < appState.drafts.count {
+                appState.selectDraft(appState.drafts[idx])
+              }
+              return .handled
+            }
+            return .ignored
+          }
+        }
+
         switch KeyChord(NSApp.currentEvent) {
         case .clearHistory:
           if let item = appState.footer.items.first(where: { $0.title == "clear" }),

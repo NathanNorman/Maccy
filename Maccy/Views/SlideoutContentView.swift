@@ -7,7 +7,14 @@ struct SlideoutContentView: View {
     VStack {
       ToolbarView()
 
-      if let item = appState.navigator.leadHistoryItem {
+      if appState.activeTab == .drafts {
+        if let draft = appState.selectedDraft {
+          DraftPreviewView(html: draft.html, identity: appState.previewIdentity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+          EmptyView()
+        }
+      } else if let item = appState.navigator.leadHistoryItem {
         PreviewItemView(item: item)
       } else if let pasteStack = appState.history.pasteStack,
         appState.navigator.pasteStackSelected {

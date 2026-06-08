@@ -24,31 +24,54 @@ struct ContentView: View {
               searchFocused: $searchFocused
             )
 
-            VStack(alignment: .leading, spacing: 0) {
-              HistoryListView(
-                searchQuery: $appState.history.searchQuery,
-                searchFocused: $searchFocused
-              )
+            if appState.activeTab == .history {
+              VStack(alignment: .leading, spacing: 0) {
+                HistoryListView(
+                  searchQuery: $appState.history.searchQuery,
+                  searchFocused: $searchFocused
+                )
 
-              FooterView(footer: appState.footer)
-            }
-            .animation(.default.speed(3), value: appState.history.items)
-            .animation(
-              .default.speed(3),
-              value: appState.history.pasteStack?.id
-            )
-            .padding(.horizontal, Popup.horizontalPadding)
-            .onAppear {
-              searchFocused = true
-            }
-            .onMouseMove {
-              appState.navigator.isKeyboardNavigating = false
+                FooterView(footer: appState.footer)
+              }
+              .animation(.default.speed(3), value: appState.history.items)
+              .animation(
+                .default.speed(3),
+                value: appState.history.pasteStack?.id
+              )
+              .padding(.horizontal, Popup.horizontalPadding)
+              .onAppear {
+                searchFocused = true
+              }
+              .onMouseMove {
+                appState.navigator.isKeyboardNavigating = false
+              }
+            } else {
+              DraftListView()
+                .padding(.horizontal, Popup.horizontalPadding)
             }
           } slideout: {
             SlideoutContentView()
           }
           .frame(minHeight: 0)
           .layoutPriority(1)
+
+          // Tab switcher
+          Picker("", selection: Binding(
+            get: { appState.activeTab },
+            set: {
+              appState.activeTab = $0
+              appState.selectedDraft = nil
+              if $0 == .drafts {
+                appState.preview.slideoutWidth = max(appState.preview.slideoutWidth, 400)
+              }
+            }
+          )) {
+            Text("History").tag(ActiveTab.history)
+            Text("Drafts").tag(ActiveTab.drafts)
+          }
+          .pickerStyle(.segmented)
+          .padding(.horizontal, Popup.horizontalPadding * 2)
+          .padding(.vertical, 6)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
