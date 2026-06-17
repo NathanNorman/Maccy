@@ -22,15 +22,15 @@
 
 ---
 
-## Maccy sandbox — `URL.applicationSupportDirectory` resolves to container, not `~/Library/Application Support/`
+## Maccy sandbox — debug build is NOT sandboxed
 
-**What failed:** Wrote `drafts.json` to `~/Library/Application Support/Maccy/` — Maccy never picked it up.
+**What failed (earlier):** Wrote `drafts.json` to `~/Library/Application Support/Maccy/` — an old release build with the sandbox enabled didn't pick it up. Switched to the container path.
 
-**Why:** Maccy is sandboxed (`com.apple.security.app-sandbox = true`). Inside the sandbox, `URL.applicationSupportDirectory` resolves to `~/Library/Containers/org.p0deje.Maccy/Data/Library/Application Support/`. Writes to the unsandboxed path are invisible to the app.
+**What actually happened:** The installed debug build (`CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO`) is not sandboxed. `URL.applicationSupportDirectory` resolves to `~/Library/Application Support/Maccy/` — the bare path, not the container.
 
-**Correct path:** `~/Library/Containers/org.p0deje.Maccy/Data/Library/Application Support/Maccy/`
+**Correct path for the debug build:** `~/Library/Application Support/Maccy/`
 
-**Note for next time:** All Maccy runtime files (drafts.json, avatar.png, preview-identity.json) must be written to the container path, not the bare `~/Library/Application Support/Maccy/` path. The CLAUDE.md Slack Drafts section documents this.
+**Note for next time:** If the app is a release/signed build with the sandbox entitlement, use `~/Library/Containers/org.p0deje.Maccy/Data/Library/Application Support/Maccy/`. If it's a debug build compiled without code signing, use the bare path. Check with `lsof -p $(pgrep Maccy) | grep drafts.json` to see which path the running process has open.
 
 ---
 
