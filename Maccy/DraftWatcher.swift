@@ -93,7 +93,6 @@ class DraftWatcher {
 
     let context = Storage.shared.context
     let existing = (try? context.fetch(FetchDescriptor<DraftItem>())) ?? []
-    let existingIds = Set(existing.map(\.id))
     let newIds = Set(payloads.map(\.id))
 
     for item in existing where !newIds.contains(item.id) {
@@ -101,15 +100,21 @@ class DraftWatcher {
     }
 
     let formatter = ISO8601DateFormatter()
-    for payload in payloads where !existingIds.contains(payload.id) {
-      let date = formatter.date(from: payload.createdAt) ?? Date.now
-      context.insert(DraftItem(
-        id: payload.id,
-        label: payload.label,
-        html: payload.html,
-        plain: payload.plain,
-        createdAt: date
-      ))
+    for payload in payloads {
+      if let existing = existing.first(where: { $0.id == payload.id }) {
+        existing.label = payload.label
+        existing.html = payload.html
+        existing.plain = payload.plain
+      } else {
+        let date = formatter.date(from: payload.createdAt) ?? Date.now
+        context.insert(DraftItem(
+          id: payload.id,
+          label: payload.label,
+          html: payload.html,
+          plain: payload.plain,
+          createdAt: date
+        ))
+      }
     }
 
     try? context.save()

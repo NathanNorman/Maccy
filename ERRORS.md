@@ -52,6 +52,18 @@
 
 ---
 
+## `DraftWatcher.ingest()` silently ignores updates to existing drafts
+
+**What failed:** When Claude writes a draft with an existing `id` (e.g. to update content), Maccy doesn't pick up the change. The draft in the Drafts tab still shows the old content.
+
+**Why:** `ingest()` only inserts payloads whose `id` is not already in `existingIds` (line 104: `for payload in payloads where !existingIds.contains(payload.id)`). If a draft already exists with the same id, any changes to `html`, `label`, or `plain` are silently skipped.
+
+**Fix:** Change the insert loop to upsert — if the id already exists, fetch the `DraftItem` and update its fields. If it doesn't exist, insert it. The delete loop (removing items no longer in the JSON) is correct and should stay.
+
+**Note for next time:** The fix is entirely in `DraftWatcher.ingest()` — no other files need changing.
+
+---
+
 ## `NSAttributedString` HTML list rendering double-bullets
 
 **What failed:** `<ul><li>` in HTML passed to `NSAttributedString` HTML parser produces double bullets — the parser adds its own `NSTextList` bullet on top of whatever CSS bullet character is specified.
