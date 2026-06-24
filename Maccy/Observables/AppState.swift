@@ -242,6 +242,8 @@ class AppState: Sendable {
       context.delete(item)
       try? context.save()
     }
+    let fileURL = DraftWatcher.draftsDir.appending(path: "\(id).json")
+    try? FileManager.default.removeItem(at: fileURL)
     drafts.removeAll { $0.id == draft.id }
     selectedDraft = drafts.first
   }
