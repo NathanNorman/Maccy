@@ -7,6 +7,7 @@ class DraftWatcher {
   private static let legacyURL = URL.applicationSupportDirectory.appending(path: "Maccy/drafts.json")
 
   private var dirSource: DispatchSourceFileSystemObject?
+  private var pendingIngest: DispatchWorkItem?
 
   func start() {
     try? FileManager.default.removeItem(at: Self.legacyURL)
@@ -18,6 +19,7 @@ class DraftWatcher {
   private func watchDirectory() {
     dirSource?.cancel()
     dirSource = nil
+    pendingIngest?.cancel()
 
     let fd = open(Self.draftsDir.path, O_EVTONLY)
     guard fd >= 0 else { return }
@@ -28,7 +30,11 @@ class DraftWatcher {
       queue: .main
     )
     source.setEventHandler { [weak self] in
-      self?.ingest()
+      guard let self else { return }
+      self.pendingIngest?.cancel()
+      let work = DispatchWorkItem { [weak self] in self?.ingest() }
+      self.pendingIngest = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
     source.setCancelHandler { close(fd) }
     source.resume()
@@ -60,6 +66,7 @@ class DraftWatcher {
 
     let context = Storage.shared.context
     let existing = (try? context.fetch(FetchDescriptor<DraftItem>())) ?? []
+    let existingById = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     let newIds = Set(payloads.map(\.id))
 
     for item in existing where !newIds.contains(item.id) {
@@ -68,7 +75,7 @@ class DraftWatcher {
 
     let formatter = ISO8601DateFormatter()
     for payload in payloads {
-      if let existing = existing.first(where: { $0.id == payload.id }) {
+      if let existing = existingById[payload.id] {
         existing.label = payload.label
         existing.html = payload.html
         existing.plain = payload.plain

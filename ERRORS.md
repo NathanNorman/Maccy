@@ -69,3 +69,13 @@
 **What failed:** `<ul><li>` in HTML passed to `NSAttributedString` HTML parser produces double bullets — the parser adds its own `NSTextList` bullet on top of whatever CSS bullet character is specified.
 
 **Fix:** Preprocess HTML before parsing: strip `<ul>`, `</ul>`, `<ol>`, `</ol>`, replace `<li>` with `<p style='margin:0 0 3px 0'>• `, replace `</li>` with `</p>`. This bypasses the NSTextList renderer entirely.
+
+---
+
+## Drafts lag is event amplification, not draft volume
+
+**What was found:** The Drafts tab feels laggy well before draft count is large (dozens of drafts). Root cause is not volume but that `DraftWatcher.ingest()` does a full-directory rescan-and-rebuild on the MAIN THREAD on every `DispatchSource` write event, with no debounce. A burst of writes fires N full rescans back-to-back. Compounding factors: an O(n²) `existing.first(where: { $0.id == payload.id })` lookup inside the per-payload loop, a full `DraftItemDecorator` array rebuild every ingest, and `DraftListView` using a non-lazy `VStack` (all rows built every render). Separately, `DraftPreviewView`'s `NSAttributedString` HTML parse is re-run on every hover (`hoverDraft` sets `selectedDraft`), which is a distinct source of browsing jank.
+
+**Fix (Tier 1, tracked in openspec change `speed-up-drafts`):** debounce the watcher ~150ms (cancellable `DispatchWorkItem`, like clawpypaste's `FileWatcher`); replace the O(n²) loop with an `[id: DraftItem]` dictionary; switch `DraftListView` to `LazyVStack`. Deferred (Tier 2/3): off-main-thread ingest, incremental single-file ingest, decorator reuse, dropping the JSON+SwiftData double bookkeeping, caching the preview parse.
+
+**Note for next time:** Before optimizing anything draft-related, remember the amplifier is the per-event full rebuild, not the number of drafts. Measure whether lag hits on save (ingest), on hover/scroll (list + preview parse), or on open.

@@ -13,7 +13,7 @@ struct DraftListView: View {
         .padding(.horizontal, Popup.horizontalPadding)
     } else {
       ScrollView {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
           ForEach(Array(appState.drafts.enumerated()), id: \.element.id) { index, draft in
             DraftItemRow(draft: draft, index: index)
           }
