@@ -5,6 +5,14 @@ struct DraftPreviewView: NSViewRepresentable {
   let html: String
   let identity: AppState.PreviewIdentity
 
+  // Unbounded in-memory cache of parsed+font-rewritten HTML previews.
+  // Eviction is deliberately deferred to a future change.
+  static var parsedCache: [String: NSAttributedString] = [:]
+
+  private var cacheKey: String {
+    "\(identity)\u{1}\(html)"
+  }
+
   func makeNSView(context: Context) -> NSScrollView {
     let scrollView = NSTextView.scrollableTextView()
     if let tv = scrollView.documentView as? NSTextView {
@@ -21,6 +29,13 @@ struct DraftPreviewView: NSViewRepresentable {
 
   func updateNSView(_ scrollView: NSScrollView, context: Context) {
     guard let tv = scrollView.documentView as? NSTextView else { return }
+
+    let key = cacheKey
+    if let cached = Self.parsedCache[key] {
+      tv.textStorage?.setAttributedString(cached)
+      return
+    }
+
     guard let data = styledHTML.data(using: .utf8),
           let parsed = try? NSAttributedString(
             data: data,
@@ -48,6 +63,7 @@ struct DraftPreviewView: NSViewRepresentable {
       mutable.addAttribute(.font, value: newFont, range: range)
     }
 
+    Self.parsedCache[key] = mutable
     tv.textStorage?.setAttributedString(mutable)
   }
 

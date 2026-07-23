@@ -8,7 +8,7 @@ struct SlideoutContentView: View {
       ToolbarView()
 
       if appState.activeTab == .drafts {
-        if let draft = appState.selectedDraft {
+        if let draft = appState.selectedDraft, appState.preview.state.isOpen {
           DraftPreviewView(html: draft.html, identity: appState.previewIdentity)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {

@@ -79,6 +79,20 @@ struct ContentView: View {
         try? await appState.history.load()
       }
     }
+    // Warm DraftListView's type metadata and first layout pass while History is
+    // showing, so the first cmd+d switch to Drafts is instant. This copy is
+    // sized/positioned via `.background`, which never contributes to the size
+    // of the view it's attached to, so it cannot affect the panel's height or
+    // the visible History layout. It only needs to exist once at launch.
+    .background {
+      if appState.activeTab == .history {
+        DraftListView()
+          .frame(width: 300, height: 400)
+          .opacity(0)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+      }
+    }
     .animation(.easeInOut(duration: 0.2), value: appState.searchVisible)
     .environment(appState)
     .environment(modifierFlags)
